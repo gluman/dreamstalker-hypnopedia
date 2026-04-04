@@ -1,0 +1,16 @@
+numpy>=1.24.0
+scipy>=1.10.0
+sounddevice>=0.4.6
+pydub>=0.25.1
+librosa>=0.10.0
+matplotlib>=3.7.0
+PyYAML>=6.0
+ragflow-sdk>=0.20.0
+requests>=2.31.0
+httpx>=0.24.0
+
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
+jinja2>=3.1.0
+aiofiles>=23.0.0

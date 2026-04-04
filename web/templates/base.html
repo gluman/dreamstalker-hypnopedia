@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DreamStalker - {% block title %}Home{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav>
+        <a href="/" class="logo">DreamStalker</a>
+        <a href="/">Dashboard</a>
+        <a href="/prepare">New Session</a>
+    </nav>
+    <main>{% block content %}{% endblock %}</main>
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

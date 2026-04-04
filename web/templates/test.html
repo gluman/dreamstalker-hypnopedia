@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Test {{ session_id[:8] }}{% endblock %}
+
+{% block content %}
+<section class="test-page" data-session="{{ session_id }}">
+    {% if not finished %}
+    <header class="test-header">
+        <h1>Test</h1>
+        <div class="progress-info">
+            <span>Question <strong id="current-num">{{ current }}</strong> of <strong>{{ total }}</strong></span>
+        </div>
+        <div class="progress-bar">
+            <div id="test-progress-fill" class="progress-fill" style="width: {{ (current / total * 100)|round }}%"></div>
+        </div>
+    </header>
+
+    <article id="question-card" class="question-card">
+        <p class="question-text" id="question-text">{{ question.text }}</p>
+        <form id="answer-form">
+            <input type="text" id="answer-input" class="answer-input" placeholder="Your answer…" autocomplete="off" required autofocus>
+            <button type="submit" class="btn btn-primary" id="next-btn">
+                {% if current == total %}Finish{% else %}Next{% endif %}
+            </button>
+        </form>
+    </article>
+
+    {% else %}
+    <div class="test-results">
+        <h1>Test Complete</h1>
+        <div class="results-summary">
+            <p class="score">{{ correct }} / {{ total }} correct</p>
+            <p class="accuracy">{{ accuracy }}% accuracy</p>
+        </div>
+        <nav class="results-nav">
+            <a href="/report/{{ session_id }}" class="btn btn-primary">View Full Report</a>
+            <a href="/session/{{ session_id }}" class="btn btn-secondary">Back to Session</a>
+        </nav>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const card = document.getElementById('question-card');
+    if (!card) return;
+
+    const sessionId = document.querySelector('.test-page').dataset.session;
+    const questionText = document.getElementById('question-text');
+    const answerInput = document.getElementById('answer-input');
+    const nextBtn = document.getElementById('next-btn');
+    const form = document.getElementById('answer-form');
+    const currentNum = document.getElementById('current-num');
+    const progressFill = document.getElementById('test-progress-fill');
+    let current = {{ current }};
+    const total = {{ total }};
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const answer = answerInput.value.trim();
+        if (!answer) return;
+
+        nextBtn.disabled = true;
+        answerInput.disabled = true;
+
+        try {
+            const res = await fetch(`/api/test/${sessionId}/submit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ answer, question_index: current - 1 })
+            });
+            const data = await res.json();
+
+            if (data.finished) {
+                window.location.href = `/test/${sessionId}?show_results=1`;
+                return;
+            }
+
+            current = data.next_index + 1;
+            currentNum.textContent = current;
+            questionText.textContent = data.next_question;
+            progressFill.style.width = `${(current / total * 100).toFixed(1)}%`;
+            answerInput.value = '';
+            answerInput.disabled = false;
+            nextBtn.disabled = false;
+            answerInput.focus();
+
+            if (current === total) {
+                nextBtn.textContent = 'Finish';
+            }
+        } catch {
+            answerInput.disabled = false;
+            nextBtn.disabled = false;
+        }
+    });
+})();
+</script>
+{% endblock %}

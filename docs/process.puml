@@ -1,0 +1,122 @@
+@startuml DreamStalker_Process
+
+skinparam backgroundColor #1a1a2e
+skinparam sequenceArrowColor #e94560
+skinparam sequenceParticipantBorderColor #0f3460
+skinparam sequenceParticipantBackgroundColor #16213e
+skinparam sequenceParticipantFontColor #eaeaea
+skinparam sequenceLifeLineBackgroundColor #0f3460
+skinparam noteBackgroundColor #16213e
+skinparam noteBorderColor #53a8b6
+skinparam noteFontColor #eaeaea
+skinparam sequenceGroupBackgroundColor #16213e
+skinparam sequenceGroupBorderColor #53a8b6
+skinparam sequenceGroupFontColor #e94560
+skinparam sequenceTitleFontColor #e94560
+skinparam sequenceArrowFontColor #eaeaea
+
+title **DreamStalker — Полный цикл обучения во сне**
+
+actor "Пользователь" as User
+boundary "UI / Менеджер" as UI
+database "RAGFlow\n(векторная БД)" as RAG
+control "Контроллер фактов" as Facts
+control "Генератор тестов" as Tests
+control "Якорной системы" as Anchors
+control "Аудио-движок" as Audio
+database "Хранилище\nрезультатов" as DB
+
+== 1. Установка цели ==
+
+User -> UI: Ставит цель (goal)
+activate UI
+
+UI -> RAG: Запрос чанков по теме
+activate RAG
+RAG --> UI: Возвращает чанки\n(релевантные фрагменты)
+deactivate RAG
+
+UI -> Facts: Передаёт чанки
+activate Facts
+
+== 2. Извлечение фактов ==
+
+Facts -> Facts: Парсинг + извлечение\nключевых фактов
+Facts --> UI: Список фактов
+deactivate Facts
+
+UI -> Tests: Генерация тестов
+activate Tests
+
+== 3. Генерация тестов ==
+
+group Тесты (4 типа)
+  Tests -> Tests: Recall — узнавание\nфактов
+  Tests -> Tests: Definition — определения\nтерминов
+  Tests -> Tests: Association —\nсвязи между концептами
+  Tests -> Tests: Fill Blank —\nзаполнение пропусков
+end
+Tests --> UI: Набор тестов (JSON)
+deactivate Tests
+
+== 4. Привязка якорей ==
+
+UI -> Anchors: Назначение якорных тонов
+activate Anchors
+Anchors -> Anchors: Каждому факту →\nуникальный тон-якорь
+Anchors --> UI: Маппинг факт→якорь
+deactivate Anchors
+
+UI -> Audio: Генерация ночного аудио
+activate Audio
+
+== 5. Генерация аудио (структура) ==
+
+group Установка (0–1 мин)
+  Audio -> Audio: Голосовое внушение\n(суггестия целей)
+  Audio -> Audio: Steganography-модуляция\n(скрытые паттерны)
+end
+
+group Декодер (1–3 мин)
+  Audio -> Audio: Якорный тон → привязка\nк релевантному факту
+  Audio -> Audio: Речь × 3 повторения\n(кодирование факта)
+end
+
+group Основной пакет (3–25 мин)
+  Audio -> Audio: Ambient фоновый звук
+  Audio -> Audio: Binaural beats\n(синхронизация полушарий)
+  Audio -> Audio: Stego-внедрение фактов
+  Audio -> Audio: Якоря — циклическое\nактивирование памяти
+end
+
+group Глубокий сон (25+ мин)
+  Audio -> Audio: Theta/Delta волны
+  Audio -> Audio: TMR cues\n(Targeted Memory Reactivation)\n— закрепление воспоминаний
+end
+
+Audio --> UI: Готовое аудио (WAV/MP3)
+deactivate Audio
+
+UI --> User: Выдаёт аудио + тесты
+deactivate UI
+
+== 6. Ночное прослушивание ==
+
+User -> User: Проигрывает аудио\nво время сна
+
+== 7. Утреннее тестирование ==
+
+User -> UI: Проходит тесты\n(утренняя сессия)
+activate UI
+
+UI -> DB: Сохраняет ответы
+activate DB
+DB --> UI: Подтверждение
+deactivate DB
+
+UI -> UI: Анализ результатов:\n• % правильных ответов\n• Сильные / слабые темы\n• Рекомендации
+
+UI --> User: Отчёт об усвоении\n(результат + рекомендации)
+deactivate UI
+
+@enduml

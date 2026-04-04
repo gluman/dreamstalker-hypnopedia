@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<section class="dashboard">
+    <header class="dashboard-header">
+        <h1>Sessions</h1>
+        <a href="/prepare" class="btn btn-primary">Create New Session</a>
+    </header>
+
+    {% if sessions %}
+    <div class="session-grid">
+        {% for session in sessions %}
+        <article class="session-card">
+            <div class="card-header">
+                <span class="session-id" title="{{ session.id }}">{{ session.id[:8] }}…</span>
+                <span class="badge badge-{{ session.status }}">{{ session.status }}</span>
+            </div>
+            <h3 class="card-goal">{{ session.goal }}</h3>
+            <time class="card-date" datetime="{{ session.created }}">{{ session.created }}</time>
+            <nav class="card-links">
+                <a href="/session/{{ session.id }}">Session</a>
+                {% if session.has_audio %}<a href="/audio/{{ session.id }}">Audio</a>{% endif %}
+                {% if session.has_package %}<a href="/package/{{ session.id }}">Package</a>{% endif %}
+                {% if session.has_test %}<a href="/test/{{ session.id }}">Test</a>{% endif %}
+                {% if session.has_report %}<a href="/report/{{ session.id }}">Report</a>{% endif %}
+            </nav>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="welcome">
+        <h2>Welcome to DreamStalker</h2>
+        <p>No sessions yet. Create your first learning session to get started.</p>
+        <ol class="instructions">
+            <li>Upload study materials (books, notes) to the knowledge base</li>
+            <li>Create a session with your learning goal</li>
+            <li>DreamStalker will generate an audio package for night learning</li>
+            <li>Take the test in the morning to check your retention</li>
+        </ol>
+        <a href="/prepare" class="btn btn-primary btn-lg">Create Your First Session</a>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

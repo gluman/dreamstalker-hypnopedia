@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+data/
+*.wav
+*.log
+*.docx
+*.pdf
+*.rtf
+*.zip
+__temp_write.py
+write_logger.py
+test_import.py
+_update_conftest.py
+_fix_session.py
+_create_deploy.py

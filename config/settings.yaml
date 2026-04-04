@@ -1,0 +1,28 @@
+ragflow:
+  base_url: "http://192.168.0.156:9380"
+  api_key: "ragflow-UJmyXeAW4Eb6OcWNCxc8oq_Q92CTUbZWGtz2hXHqRq8"
+
+audio:
+  sample_rate: 44100
+  default_duration_hours: 8
+  base_binaural_freq: 200.0
+  volume: 0.3
+  stego:
+    method: "phase"
+    carrier_freq: 16000.0
+
+sleep_phases:
+  wake_to_alpha_min: 30
+  alpha_to_theta_min: 60
+  cycle_duration_min: 90
+
+tmr:
+  enabled: true
+  cue_interval_sec: 300
+  cue_duration_sec: 2
+  cue_freq: 800
+
+paths:
+  audio_output: "data/audio"
+  sessions: "data/sessions"
+  dreams: "data/dreams"

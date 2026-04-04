@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}New Session{% endblock %}
+
+{% block content %}
+<section class="prepare">
+    <h1>Create New Session</h1>
+
+    <div class="upload-section">
+        <h2>Upload Study Materials</h2>
+        <div id="drop-zone" class="drop-zone">
+            <input type="file" id="file-input" multiple accept=".pdf,.docx,.txt,.md,.epub" hidden>
+            <p>Drag & drop files here</p>
+            <p class="drop-hint">or <button type="button" id="browse-btn" class="btn btn-secondary">Browse</button></p>
+            <p class="supported">Supported: PDF, DOCX, TXT, MD, EPUB</p>
+        </div>
+        <ul id="upload-status" class="upload-status"></ul>
+    </div>
+
+    <form id="session-form" class="session-form">
+        <div class="form-group">
+            <label for="goal">Learning Goal</label>
+            <textarea id="goal" name="goal" rows="3" required
+                placeholder="e.g. Understand the key concepts of quantum mechanics, focusing on wave-particle duality and uncertainty principle"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="item-count">Number of Knowledge Items: <span id="count-display">15</span></label>
+            <input type="range" id="item-count" name="item_count" min="5" max="50" value="15" step="1">
+            <div class="range-labels">
+                <span>5</span>
+                <span>50</span>
+            </div>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn btn-primary btn-lg">Generate Session</button>
+    </form>
+
+    <div id="progress" class="progress hidden">
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <span id="progress-percent" class="progress-percent">0%</span>
+        </div>
+        <p id="progress-text" class="progress-text">Planning session…</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const browseBtn = document.getElementById('browse-btn');
+    const uploadStatus = document.getElementById('upload-status');
+    const form = document.getElementById('session-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const progress = document.getElementById('progress');
+    const progressFill = document.getElementById('progress-fill');
+    const progressText = document.getElementById('progress-text');
+    const countSlider = document.getElementById('item-count');
+    const countDisplay = document.getElementById('count-display');
+
+    countSlider.addEventListener('input', () => {
+        countDisplay.textContent = countSlider.value;
+    });
+
+    // Drag & drop
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        uploadFiles(e.dataTransfer.files);
+    });
+    browseBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => uploadFiles(fileInput.files));
+
+    async function uploadFiles(files) {
+        for (const file of files) {
+            const li = document.createElement('li');
+            li.textContent = `${file.name} — uploading…`;
+            uploadStatus.appendChild(li);
+
+            const fd = new FormData();
+            fd.append('file', file);
+            try {
+                const res = await fetch('/api/upload', { method: 'POST', body: fd });
+                const data = await res.json();
+                li.textContent = `${file.name} — ${data.ok ? 'done' : 'error'}`;
+                li.className = data.ok ? 'upload-ok' : 'upload-error';
+            } catch {
+                li.textContent = `${file.name} — failed`;
+                li.className = 'upload-error';
+            }
+        }
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        submitBtn.disabled = true;
+        progress.classList.remove('hidden');
+
+        const goal = document.getElementById('goal').value.trim();
+        const itemCount = parseInt(countSlider.value);
+
+        try {
+            progressText.textContent = 'Planning session…';
+            progressFill.style.width = '10%';
+
+            const planRes = await fetch('/api/plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ goal, count: itemCount })
+            });
+            const planData = await planRes.json();
+            if (planData.error) throw new Error(planData.error);
+
+            progressText.textContent = 'Preparing session…';
+            progressFill.style.width = '20%';
+
+            const prepRes = await fetch('/api/prepare', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan: planData.plan })
+            });
+            const prep = await prepRes.json();
+            if (prep.error) throw new Error(prep.error);
+
+            if (prep.progress_id) {
+                await pollProgress(prep.progress_id);
+            }
+
+            progressFill.style.width = '100%';
+            progressText.textContent = 'Done! Redirecting…';
+            const percentEl = document.getElementById('progress-percent');
+            if (percentEl) percentEl.textContent = '100%';
+
+            setTimeout(() => {
+                window.location.href = `/session/${prep.session_id}`;
+            }, 1000);
+
+        } catch (err) {
+            progressText.textContent = `Error: ${err.message}`;
+            progressFill.style.width = '0%';
+            submitBtn.disabled = false;
+        }
+    });
+
+    function pollProgress(progressId) {
+        return new Promise((resolve, reject) => {
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/progress/${progressId}`);
+                    const data = await res.json();
+                    progressFill.style.width = data.percent + '%';
+                    progressText.textContent = data.message;
+                    const percentEl = document.getElementById('progress-percent');
+                    if (percentEl) percentEl.textContent = data.percent + '%';
+                    if (data.step === 'done' || data.percent >= 100) {
+                        clearInterval(interval);
+                        resolve();
+                    }
+                } catch (e) {
+                    clearInterval(interval);
+                    reject(e);
+                }
+            }, 2000);
+        });
+    }
+})();
+</script>
+{% endblock %}

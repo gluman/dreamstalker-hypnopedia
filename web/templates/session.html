@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Session {{ session.id[:8] }}{% endblock %}
+
+{% block content %}
+<section class="session-detail">
+    <header class="session-header">
+        <h1>Session</h1>
+        <span class="badge badge-{{ session.status }}">{{ session.status }}</span>
+    </header>
+
+    <dl class="info-grid">
+        <dt>ID</dt>
+        <dd class="mono">{{ session.id }}</dd>
+        <dt>Goal</dt>
+        <dd>{{ session.goal }}</dd>
+        <dt>Created</dt>
+        <dd><time datetime="{{ session.created }}">{{ session.created }}</time></dd>
+    </dl>
+
+    {% if session.has_audio %}
+    <section class="section-audio">
+        <h2>Night Audio</h2>
+        <audio controls preload="none">
+            <source src="/audio/{{ session.id }}" type="audio/mpeg">
+            Your browser does not support audio playback.
+        </audio>
+        <a href="/audio/{{ session.id }}" download class="btn btn-secondary">Download Audio</a>
+    </section>
+    {% endif %}
+
+    {% if session.items %}
+    <section class="section-package">
+        <h2>Knowledge Package</h2>
+        <ol class="item-list">
+            {% for item in session.items %}
+            <li id="item-{{ loop.index }}">
+                <strong>{{ item.title }}</strong>
+                <p>{{ item.summary }}</p>
+            </li>
+            {% endfor %}
+        </ol>
+    </section>
+    {% endif %}
+
+    <section class="section-test">
+        <h2>Test</h2>
+        {% if session.has_test %}
+            <a href="/test/{{ session.id }}" class="btn btn-primary">Start Test</a>
+        {% else %}
+            <p>Test will be available once the session is ready.</p>
+        {% endif %}
+    </section>
+
+    {% if session.has_report %}
+    <section class="section-report">
+        <h2>Report</h2>
+        <a href="/report/{{ session.id }}" class="btn btn-secondary">View Report</a>
+    </section>
+    {% endif %}
+</section>
+{% endblock %}

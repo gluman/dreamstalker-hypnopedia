@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Report {{ session_id[:8] }}{% endblock %}
+
+{% block content %}
+<section class="report-page">
+    <header class="report-header">
+        <h1>Session Report</h1>
+        <a href="/session/{{ session_id }}" class="btn btn-secondary">Back to Session</a>
+    </header>
+
+    <div class="report-summary">
+        <div class="score-circle {% if accuracy >= 80 %}score-high{% elif accuracy >= 50 %}score-mid{% else %}score-low{% endif %}">
+            <span class="score-value">{{ accuracy }}%</span>
+            <span class="score-label">Accuracy</span>
+        </div>
+        <dl class="score-details">
+            <dt>Correct</dt>
+            <dd class="text-green">{{ correct }}</dd>
+            <dt>Incorrect</dt>
+            <dd class="text-red">{{ incorrect }}</dd>
+            <dt>Total</dt>
+            <dd>{{ total }}</dd>
+        </dl>
+    </div>
+
+    {% if weak_items or strong_items %}
+    <section class="items-breakdown">
+        <h2>Performance by Topic</h2>
+        <div class="breakdown-grid">
+            {% if strong_items %}
+            <div class="breakdown-col">
+                <h3 class="text-green">Strong Items</h3>
+                <ul class="item-tags">
+                    {% for item in strong_items %}
+                    <li class="tag tag-green">{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            {% if weak_items %}
+            <div class="breakdown-col">
+                <h3 class="text-red">Weak Items</h3>
+                <ul class="item-tags">
+                    {% for item in weak_items %}
+                    <li class="tag tag-red">{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="questions-review">
+        <h2>Questions & Answers</h2>
+        <ol class="qa-list">
+            {% for qa in questions %}
+            <li class="qa-item {% if qa.correct %}qa-correct{% else %}qa-incorrect{% endif %}">
+                <p class="qa-question">{{ qa.question }}</p>
+                <div class="qa-answers">
+                    <p class="qa-user-answer">
+                        <span class="qa-label">Your answer:</span>
+                        <span class="{% if qa.correct %}text-green{% else %}text-red{% endif %}">{{ qa.user_answer }}</span>
+                    </p>
+                    {% if not qa.correct %}
+                    <p class="qa-correct-answer">
+                        <span class="qa-label">Correct answer:</span>
+                        <span class="text-green">{{ qa.correct_answer }}</span>
+                    </p>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ol>
+    </section>
+</section>
+{% endblock %}
