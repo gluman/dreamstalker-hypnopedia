@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matrix Test — Китайский язык</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a1a; color: #e0e0e0; min-height: 100vh; }
+  .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+  h1 { text-align: center; color: #00ff88; font-size: 1.8em; margin: 20px 0; text-shadow: 0 0 20px rgba(0,255,136,0.3); }
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+  .tab { padding: 10px 20px; border: 1px solid #333; border-radius: 8px; background: #1a1a2e; cursor: pointer; transition: all 0.2s; font-size: 0.9em; }
+  .tab:hover { border-color: #00ff88; background: #1a2a1e; }
+  .tab.active { background: #00ff88; color: #0a0a1a; border-color: #00ff88; font-weight: 600; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .stats { display: flex; gap: 15px; margin-bottom: 20px; justify-content: center; flex-wrap: wrap; }
+  .stat { background: #1a1a2e; border: 1px solid #333; border-radius: 8px; padding: 12px 20px; text-align: center; min-width: 120px; }
+  .stat-value { font-size: 1.8em; font-weight: 700; color: #00ff88; }
+  .stat-label { font-size: 0.75em; color: #888; margin-top: 4px; }
+  .question-card { background: #1a1a2e; border: 1px solid #333; border-radius: 12px; padding: 24px; margin-bottom: 16px; transition: border-color 0.3s; }
+  .question-card.correct { border-color: #00ff88; background: #1a2a1e; }
+  .question-card.wrong { border-color: #ff4444; background: #2a1a1a; }
+  .q-number { font-size: 0.8em; color: #666; margin-bottom: 8px; }
+  .q-text { font-size: 1.3em; margin-bottom: 16px; line-height: 1.5; }
+  .q-chinese { font-size: 2em; color: #00ff88; margin-bottom: 8px; }
+  .q-pinyin { font-size: 1em; color: #aaa; margin-bottom: 12px; }
+  .options { display: flex; flex-direction: column; gap: 8px; }
+  .option { padding: 12px 16px; border: 1px solid #333; border-radius: 8px; cursor: pointer; transition: all 0.2s; background: #12122a; }
+  .option:hover { border-color: #00ff88; background: #1a2a2e; }
+  .option.selected { border-color: #00ff88; background: #1a3a2e; }
+  .option.correct-answer { border-color: #00ff88; background: #1a3a1e; }
+  .option.wrong-answer { border-color: #ff4444; background: #3a1a1a; }
+  .input-answer { width: 100%; padding: 12px 16px; border: 1px solid #333; border-radius: 8px; background: #12122a; color: #e0e0e0; font-size: 1.1em; }
+  .input-answer:focus { outline: none; border-color: #00ff88; }
+  .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1em; font-weight: 600; transition: all 0.2s; }
+  .btn-primary { background: #00ff88; color: #0a0a1a; }
+  .btn-primary:hover { background: #00cc66; }
+  .btn-secondary { background: #333; color: #e0e0e0; }
+  .btn-secondary:hover { background: #444; }
+  .actions { display: flex; gap: 12px; margin-top: 20px; justify-content: center; flex-wrap: wrap; }
+  .result-msg { margin-top: 12px; padding: 8px 12px; border-radius: 6px; font-size: 0.9em; }
+  .result-msg.correct { background: #1a3a1e; color: #00ff88; }
+  .result-msg.wrong { background: #3a1a1a; color: #ff6666; }
+  .progress-bar { width: 100%; height: 6px; background: #333; border-radius: 3px; margin-bottom: 20px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #00ff88; transition: width 0.3s; }
+  .score-display { text-align: center; padding: 40px; }
+  .score-circle { width: 150px; height: 150px; border-radius: 50%; border: 4px solid #00ff88; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 2.5em; font-weight: 700; color: #00ff88; }
+  .score-circle.low { border-color: #ff4444; color: #ff4444; }
+  .score-circle.mid { border-color: #ffaa00; color: #ffaa00; }
+  .config-section { background: #1a1a2e; border: 1px solid #333; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+  .config-section h3 { color: #00ff88; margin-bottom: 16px; }
+  .config-row { display: flex; gap: 12px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+  .config-row label { min-width: 140px; color: #aaa; }
+  select, input[type="number"] { padding: 8px 12px; border: 1px solid #333; border-radius: 6px; background: #12122a; color: #e0e0e0; font-size: 0.9em; }
+  .word-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-top: 12px; }
+  .word-item { background: #12122a; border: 1px solid #333; border-radius: 6px; padding: 10px; text-align: center; }
+  .word-cn { font-size: 1.4em; color: #00ff88; }
+  .word-py { font-size: 0.85em; color: #aaa; }
+  .word-ru { font-size: 0.85em; color: #888; }
+  .hidden { display: none; }
+  .flashcard { perspective: 1000px; height: 200px; cursor: pointer; margin-bottom: 16px; }
+  .flashcard-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
+  .flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+  .flashcard-front, .flashcard-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+  .flashcard-front { background: #1a1a2e; border: 1px solid #333; }
+  .flashcard-back { background: #1a2a1e; border: 1px solid #00ff88; transform: rotateY(180deg); }
+  .flashcard-hint { font-size: 0.8em; color: #666; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧠 Matrix Test — 中文</h1>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="config">Настройка</div>
+    <div class="tab" data-tab="words">Слова</div>
+    <div class="tab" data-tab="grammar">Грамматика</div>
+    <div class="tab" data-tab="dialogues">Диалоги</div>
+    <div class="tab" data-tab="tones">Тоны</div>
+    <div class="tab" data-tab="flashcards">Флеш-карты</div>
+    <div class="tab" data-tab="results">Результаты</div>
+  </div>
+
+  <!-- CONFIG -->
+  <div class="panel active" id="panel-config">
+    <div class="config-section">
+      <h3>Настройка теста</h3>
+      <div class="config-row">
+        <label>Тип теста:</label>
+        <select id="testType">
+          <option value="cn2ru">Китайский → Русский</option>
+          <option value="ru2cn">Русский → Китайский</option>
+          <option value="py2cn">Пиньинь → Иероглиф</option>
+          <option value="cn2py">Иероглиф → Пиньинь</option>
+          <option value="mixed">Смешанный</option>
+        </select>
+      </div>
+      <div class="config-row">
+        <label>Количество вопросов:</label>
+        <input type="number" id="questionCount" value="20" min="5" max="100">
+      </div>
+      <div class="config-row">
+        <label>Формат ответа:</label>
+        <select id="answerFormat">
+          <option value="choice">Выбор из 4 вариантов</option>
+          <option value="input">Ввод текста</option>
+        </select>
+      </div>
+      <div class="config-row">
+        <label>Диапазон слов:</label>
+        <select id="wordRange">
+          <option value="all">Все (221 слово)</option>
+          <option value="first50">Первые 50</option>
+          <option value="first100">Первые 100</option>
+          <option value="random50">Случайные 50</option>
+        </select>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="startTest('words')">Начать тест: Слова</button>
+        <button class="btn btn-primary" onclick="startTest('grammar')">Начать тест: Грамматика</button>
+        <button class="btn btn-primary" onclick="startTest('dialogues')">Начать тест: Диалоги</button>
+        <button class="btn btn-primary" onclick="startTest('tones')">Начать тест: Тоны</button>
+      </div>
+    </div>
+    <div class="config-section">
+      <h3>Быстрый старт</h3>
+      <div class="actions">
+        <button class="btn btn-secondary" onclick="startFlashcards()">Флеш-карты (все слова)</button>
+        <button class="btn btn-secondary" onclick="showAllWords()">Справочник слов</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORDS TEST -->
+  <div class="panel" id="panel-words">
+    <div class="stats">
+      <div class="stat"><div class="stat-value" id="w-correct">0</div><div class="stat-label">Верно</div></div>
+      <div class="stat"><div class="stat-value" id="w-wrong">0</div><div class="stat-label">Ошибки</div></div>
+      <div class="stat"><div class="stat-value" id="w-remaining">0</div><div class="stat-label">Осталось</div></div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="w-progress" style="width:0%"></div></div>
+    <div id="w-questions"></div>
+    <div class="actions">
+      <button class="btn btn-primary hidden" id="w-next" onclick="nextQuestion('words')">Далее →</button>
+      <button class="btn btn-secondary" onclick="showPanel('config')">← Назад</button>
+    </div>
+  </div>
+
+  <!-- GRAMMAR TEST -->
+  <div class="panel" id="panel-grammar">
+    <div class="stats">
+      <div class="stat"><div class="stat-value" id="g-correct">0</div><div class="stat-label">Верно</div></div>
+      <div class="stat"><div class="stat-value" id="g-wrong">0</div><div class="stat-label">Ошибки</div></div>
+      <div class="stat"><div class="stat-value" id="g-remaining">0</div><div class="stat-label">Осталось</div></div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="g-progress" style="width:0%"></div></div>
+    <div id="g-questions"></div>
+    <div class="actions">
+      <button class="btn btn-primary hidden" id="g-next" onclick="nextQuestion('grammar')">Далее →</button>
+      <button class="btn btn-secondary" onclick="showPanel('config')">← Назад</button>
+    </div>
+  </div>
+
+  <!-- DIALOGUES TEST -->
+  <div class="panel" id="panel-dialogues">
+    <div class="stats">
+      <div class="stat"><div class="stat-value" id="d-correct">0</div><div class="stat-label">Верно</div></div>
+      <div class="stat"><div class="stat-value" id="d-wrong">0</div><div class="stat-label">Ошибки</div></div>
+      <div class="stat"><div class="stat-value" id="d-remaining">0</div><div class="stat-label">Осталось</div></div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="d-progress" style="width:0%"></div></div>
+    <div id="d-questions"></div>
+    <div class="actions">
+      <button class="btn btn-primary hidden" id="d-next" onclick="nextQuestion('dialogues')">Далее →</button>
+      <button class="btn btn-secondary" onclick="showPanel('config')">← Назад</button>
+    </div>
+  </div>
+
+  <!-- TONES TEST -->
+  <div class="panel" id="panel-tones">
+    <div class="stats">
+      <div class="stat"><div class="stat-value" id="t-correct">0</div><div class="stat-label">Верно</div></div>
+      <div class="stat"><div class="stat-value" id="t-wrong">0</div><div class="stat-label">Ошибки</div></div>
+      <div class="stat"><div class="stat-value" id="t-remaining">0</div><div class="stat-label">Осталось</div></div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="t-progress" style="width:0%"></div></div>
+    <div id="t-questions"></div>
+    <div class="actions">
+      <button class="btn btn-primary hidden" id="t-next" onclick="nextQuestion('tones')">Далее →</button>
+      <button class="btn btn-secondary" onclick="showPanel('config')">← Назад</button>
+    </div>
+  </div>
+
+  <!-- FLASHCARDS -->
+  <div class="panel" id="panel-flashcards">
+    <div class="stats">
+      <div class="stat"><div class="stat-value" id="fc-current">1</div><div class="stat-label">Текущая</div></div>
+      <div class="stat"><div class="stat-value" id="fc-total">0</div><div class="stat-label">Всего</div></div>
+    </div>
+    <div class="flashcard" id="flashcard" onclick="this.classList.toggle('flipped')">
+      <div class="flashcard-inner">
+        <div class="flashcard-front">
+          <div class="q-chinese" id="fc-front-text"></div>
+          <div class="flashcard-hint">Нажмите, чтобы перевернуть</div>
+        </div>
+        <div class="flashcard-back">
+          <div class="q-pinyin" id="fc-back-py"></div>
+          <div id="fc-back-ru" style="font-size:1.2em;margin-top:8px;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="fcPrev()">← Назад</button>
+      <button class="btn btn-primary" onclick="fcNext()">Далее →</button>
+      <button class="btn btn-secondary" onclick="showPanel('config')">← Назад</button>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="panel" id="panel-results">
+    <div id="results-content"></div>
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="showPanel('config')">← Назад</button>
+    </div>
+  </div>
+
+  <!-- WORDS REFERENCE -->
+  <div class="panel" id="panel-reference">
+    <h3 style="color:#00ff88;margin-bottom:16px;">Справочник: Все слова</h3>
+    <input type="text" id="word-search" placeholder="Поиск..." style="width:100%;padding:10px 16px;border:1px solid #333;border-radius:8px;background:#12122a;color:#e0e0e0;margin-bottom:16px;" oninput="filterWords()">
+    <div class="word-grid" id="word-grid"></div>
+    <div class="actions"><button class="btn btn-secondary" onclick="showPanel('config')">← Назад</button></div>
+  </div>
+</div>
+
+<script>
+const PACKAGE_URL = 'data/chinese/matrix/core_package.json';
+let pkg = null;
+let testState = {};
+let fcIndex = 0;
+let fcWords = [];
+let testHistory = [];
+
+async function loadPackage() {
+  try {
+    const resp = await fetch(PACKAGE_URL);
+    pkg = await resp.json();
+    console.log(`Loaded: ${pkg.core_words_300.length} words`);
+  } catch(e) {
+    alert('Не удалось загрузить core_package.json. Убедитесь, что файл находится в data/chinese/matrix/');
+    console.error(e);
+  }
+}
+
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const panel = document.getElementById('panel-' + name);
+  if (panel) panel.classList.add('active');
+  const tab = document.querySelector(`.tab[data-tab="${name}"]`);
+  if (tab) tab.classList.add('active');
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const name = tab.dataset.tab;
+    if (name === 'results') showResults();
+    else if (name !== 'config') showPanel(name);
+    else showPanel('config');
+  });
+});
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function getWordSubset() {
+  const range = document.getElementById('wordRange').value;
+  const words = pkg.core_words_300;
+  if (range === 'first50') return words.slice(0, 50);
+  if (range === 'first100') return words.slice(0, 100);
+  if (range === 'random50') return shuffle(words).slice(0, 50);
+  return words;
+}
+
+function pickWrong(words, correct, field, count = 3) {
+  const wrongs = shuffle(words.filter(w => w[field] !== correct[field])).slice(0, count);
+  return wrongs;
+}
+
+function generateOptions(correct, words, field, displayField) {
+  const wrongs = pickWrong(words, correct, field, 3);
+  const options = shuffle([correct, ...wrongs]);
+  return options.map(o => ({ text: o[displayField], correct: o === correct }));
+}
+
+function startTest(type) {
+  if (!pkg) { alert('Пакет не загружен'); return; }
+  const count = parseInt(document.getElementById('questionCount').value) || 20;
+  const format = document.getElementById('answerFormat').value;
+
+  testState = { type, format, questions: [], current: 0, correct: 0, wrong: 0, answers: [] };
+
+  if (type === 'words') {
+    const words = shuffle(getWordSubset()).slice(0, count);
+    const testType = document.getElementById('testType').value;
+    words.forEach(w => {
+      let qText, qChinese, qPinyin, answer, options;
+      const t = testType === 'mixed' ? ['cn2ru','ru2cn','py2cn','cn2py'][Math.floor(Math.random()*4)] : testType;
+      if (t === 'cn2ru') {
+        qChinese = w.cn; qPinyin = w.py;
+        qText = `Что означает: ${w.cn} (${w.py})?`;
+        answer = w.ru;
+        options = generateOptions(w, getWordSubset(), 'ru', 'ru');
+      } else if (t === 'ru2cn') {
+        qText = `Как будет "${w.ru}" по-китайски?`;
+        answer = w.cn;
+        options = generateOptions(w, getWordSubset(), 'cn', 'cn');
+      } else if (t === 'py2cn') {
+        qText = `Какой иероглиф соответствует пиньиню: ${w.py}?`;
+        answer = w.cn;
+        options = generateOptions(w, getWordSubset(), 'cn', 'cn');
+      } else {
+        qChinese = w.cn;
+        qText = `Какой пиньинь у иероглифа: ${w.cn}?`;
+        answer = w.py;
+        options = generateOptions(w, getWordSubset(), 'py', 'py');
+      }
+      testState.questions.push({ qText, qChinese, qPinyin, answer, options, userAnswer: null, isCorrect: null, word: w });
+    });
+    renderQuestions('w');
+    showPanel('words');
+  }
+
+  if (type === 'grammar') {
+    const patterns = shuffle(pkg.grammar_patterns).slice(0, count);
+    patterns.forEach(p => {
+      const parts = p.split(': ');
+      const pattern = parts[0] || p;
+      const example = parts[1] || '';
+      testState.questions.push({
+        qText: `Что означает грамматическая конструкция?`,
+        qChinese: pattern,
+        qPinyin: example,
+        answer: p,
+        options: null,
+        userAnswer: null,
+        isCorrect: null
+      });
+    });
+    renderQuestions('g');
+    showPanel('grammar');
+  }
+
+  if (type === 'dialogues') {
+    const dialogues = shuffle(pkg.dialogue_templates).slice(0, count);
+    dialogues.forEach(d => {
+      const qType = Math.random() > 0.5 ? 'cn2ru' : 'ru2cn';
+      if (qType === 'cn2ru') {
+        testState.questions.push({
+          qText: `Что означает эта фраза?`,
+          qChinese: d.cn,
+          qPinyin: d.py,
+          answer: d.ru,
+          options: null,
+          userAnswer: null,
+          isCorrect: null
+        });
+      } else {
+        testState.questions.push({
+          qText: `Как сказать по-китайски: "${d.ru}"?`,
+          answer: d.cn,
+          qPinyin: d.py,
+          options: null,
+          userAnswer: null,
+          isCorrect: null
+        });
+      }
+    });
+    renderQuestions('d');
+    showPanel('dialogues');
+  }
+
+  if (type === 'tones') {
+    const toneData = [
+      { tone: 'Тон 1 (mā)', desc: 'Высокий ровный, как нота', example: '妈 mā — мама' },
+      { tone: 'Тон 2 (má)', desc: 'Восходящий, как вопрос', example: '麻 má — конопля' },
+      { tone: 'Тон 3 (mǎ)', desc: 'Нисходяще-восходящий', example: '马 mǎ — лошадь' },
+      { tone: 'Тон 4 (mà)', desc: 'Резкий нисходящий', example: '骂 mà — ругать' },
+      { tone: 'Нейтральный (ma)', desc: 'Лёгкий, короткий', example: '吗 ma — вопросительная частица' },
+    ];
+    const qs = shuffle(toneData).slice(0, Math.min(count, toneData.length));
+    qs.forEach(t => {
+      testState.questions.push({
+        qText: `Какой это тон?`,
+        qChinese: t.example,
+        qPinyin: t.desc,
+        answer: t.tone,
+        options: shuffle(toneData.map(x => ({ text: x.tone, correct: x.tone === t.tone }))),
+        userAnswer: null,
+        isCorrect: null
+      });
+    });
+    renderQuestions('t');
+    showPanel('tones');
+  }
+
+  updateStats();
+}
+
+function renderQuestions(prefix) {
+  const container = document.getElementById(prefix + '-questions');
+  container.innerHTML = '';
+  const q = testState.questions[testState.current];
+  if (!q) return;
+
+  let html = `<div class="question-card" id="${prefix}-card">`;
+  html += `<div class="q-number">Вопрос ${testState.current + 1} из ${testState.questions.length}</div>`;
+  if (q.qChinese) html += `<div class="q-chinese">${q.qChinese}</div>`;
+  if (q.qPinyin) html += `<div class="q-pinyin">${q.qPinyin}</div>`;
+  html += `<div class="q-text">${q.qText}</div>`;
+
+  if (testState.format === 'choice' && q.options) {
+    html += `<div class="options">`;
+    q.options.forEach((opt, i) => {
+      html += `<div class="option" id="${prefix}-opt-${i}" onclick="selectOption('${prefix}', ${i})">${opt.text}</div>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<input type="text" class="input-answer" id="${prefix}-input" placeholder="Введите ответ..." onkeydown="if(event.key==='Enter')submitInput('${prefix}')">`;
+    html += `<div class="actions" style="margin-top:12px"><button class="btn btn-primary" onclick="submitInput('${prefix}')">Проверить</button></div>`;
+  }
+
+  html += `<div class="result-msg hidden" id="${prefix}-result"></div>`;
+  html += `</div>`;
+  container.innerHTML = html;
+
+  document.getElementById(prefix + '-next').classList.add('hidden');
+}
+
+function selectOption(prefix, idx) {
+  const q = testState.questions[testState.current];
+  if (q.userAnswer !== null) return;
+
+  q.userAnswer = q.options[idx].text;
+  q.isCorrect = q.options[idx].correct;
+
+  document.querySelectorAll(`#${prefix}-questions .option`).forEach((el, i) => {
+    el.style.pointerEvents = 'none';
+    if (q.options[i].correct) el.classList.add('correct-answer');
+    if (i === idx && !q.options[i].correct) el.classList.add('wrong-answer');
+  });
+
+  finishQuestion(prefix);
+}
+
+function submitInput(prefix) {
+  const q = testState.questions[testState.current];
+  if (q.userAnswer !== null) return;
+
+  const input = document.getElementById(prefix + '-input');
+  const val = input.value.trim().toLowerCase();
+  q.userAnswer = input.value.trim();
+  const correct = q.answer.toLowerCase();
+  q.isCorrect = val === correct || val.includes(correct) || correct.includes(val) || similarity(val, correct) > 0.6;
+
+  finishQuestion(prefix);
+}
+
+function similarity(a, b) {
+  if (!a || !b) return 0;
+  const sa = new Set(a.split(''));
+  const sb = new Set(b.split(''));
+  const inter = [...sa].filter(x => sb.has(x));
+  return inter.length / Math.max(sa.size, sb.size);
+}
+
+function finishQuestion(prefix) {
+  const q = testState.questions[testState.current];
+  if (q.isCorrect) testState.correct++;
+  else testState.wrong++;
+
+  const result = document.getElementById(prefix + '-result');
+  result.classList.remove('hidden');
+  if (q.isCorrect) {
+    result.classList.add('correct');
+    result.textContent = '✓ Верно!';
+  } else {
+    result.classList.add('wrong');
+    result.textContent = `✗ Неверно. Правильный ответ: ${q.answer}`;
+  }
+
+  const card = document.getElementById(prefix + '-card');
+  card.classList.add(q.isCorrect ? 'correct' : 'wrong');
+
+  testState.answers.push({ question: q.qText, userAnswer: q.userAnswer, correct: q.isCorrect, word: q.word });
+  updateStats();
+
+  if (testState.current < testState.questions.length - 1) {
+    document.getElementById(prefix + '-next').classList.remove('hidden');
+  } else {
+    saveResults();
+    document.getElementById(prefix + '-next').textContent = 'Результаты →';
+    document.getElementById(prefix + '-next').classList.remove('hidden');
+    document.getElementById(prefix + '-next').onclick = () => { showResults(); };
+  }
+}
+
+function nextQuestion(type) {
+  testState.current++;
+  const prefix = { words: 'w', grammar: 'g', dialogues: 'd', tones: 't' }[type];
+  if (testState.current >= testState.questions.length) {
+    showResults();
+    return;
+  }
+  renderQuestions(prefix);
+  updateStats();
+}
+
+function updateStats() {
+  const prefix = { words: 'w', grammar: 'g', dialogues: 'd', tones: 't' }[testState.type];
+  if (!prefix) return;
+  document.getElementById(prefix + '-correct').textContent = testState.correct;
+  document.getElementById(prefix + '-wrong').textContent = testState.wrong;
+  document.getElementById(prefix + '-remaining').textContent = testState.questions.length - testState.current - 1;
+  const pct = ((testState.current + 1) / testState.questions.length) * 100;
+  document.getElementById(prefix + '-progress').style.width = pct + '%';
+}
+
+function saveResults() {
+  const pct = Math.round(testState.correct / testState.questions.length * 100);
+  testHistory.push({
+    date: new Date().toLocaleString(),
+    type: testState.type,
+    correct: testState.correct,
+    total: testState.questions.length,
+    percent: pct,
+    answers: testState.answers
+  });
+  localStorage.setItem('matrix_test_history', JSON.stringify(testHistory));
+}
+
+function showResults() {
+  showPanel('results');
+  const container = document.getElementById('results-content');
+  if (testHistory.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:#888;padding:40px;">Пока нет результатов. Пройдите тест!</p>';
+    return;
+  }
+  let html = '';
+  testHistory.slice().reverse().forEach((r, i) => {
+    const cls = r.percent >= 80 ? '' : r.percent >= 50 ? 'mid' : 'low';
+    html += `<div class="question-card">
+      <div class="q-number">${r.date}</div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div class="score-circle ${cls}" style="width:80px;height:80px;font-size:1.5em;">${r.percent}%</div>
+        <div>
+          <div style="font-size:1.2em;font-weight:600;">${r.type} — ${r.correct}/${r.total}</div>
+          <div style="color:#888;font-size:0.85em;">${r.type === 'words' ? 'Слова' : r.type === 'grammar' ? 'Грамматика' : r.type === 'dialogues' ? 'Диалоги' : 'Тоны'}</div>
+        </div>
+      </div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function startFlashcards() {
+  if (!pkg) return;
+  fcWords = shuffle(pkg.core_words_300);
+  fcIndex = 0;
+  document.getElementById('fc-total').textContent = fcWords.length;
+  renderFlashcard();
+  showPanel('flashcards');
+}
+
+function renderFlashcard() {
+  const w = fcWords[fcIndex];
+  document.getElementById('fc-front-text').textContent = w.cn;
+  document.getElementById('fc-back-py').textContent = w.py;
+  document.getElementById('fc-back-ru').textContent = w.ru;
+  document.getElementById('fc-current').textContent = fcIndex + 1;
+  document.getElementById('flashcard').classList.remove('flipped');
+}
+
+function fcNext() {
+  if (fcIndex < fcWords.length - 1) { fcIndex++; renderFlashcard(); }
+}
+function fcPrev() {
+  if (fcIndex > 0) { fcIndex--; renderFlashcard(); }
+}
+
+function showAllWords() {
+  if (!pkg) return;
+  const grid = document.getElementById('word-grid');
+  grid.innerHTML = '';
+  pkg.core_words_300.forEach(w => {
+    grid.innerHTML += `<div class="word-item">
+      <div class="word-cn">${w.cn}</div>
+      <div class="word-py">${w.py}</div>
+      <div class="word-ru">${w.ru}</div>
+    </div>`;
+  });
+  showPanel('reference');
+}
+
+function filterWords() {
+  const query = document.getElementById('word-search').value.toLowerCase();
+  document.querySelectorAll('#word-grid .word-item').forEach(el => {
+    const text = el.textContent.toLowerCase();
+    el.style.display = text.includes(query) ? '' : 'none';
+  });
+}
+
+loadPackage();
+</script>
+</body>
+</html>
