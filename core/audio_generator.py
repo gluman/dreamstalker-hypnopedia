@@ -294,7 +294,7 @@ class NightAudioGenerator:
                 main_track[pos:pos + len(anchor)] += anchor * 0.2
             pos += anchor_interval
             aidx += 1
-        all_facts = sep.join(item.get('fact', '') for item in items)
+        all_facts = " ||| ".join(item.get('fact', '') for item in items)
         stego_main = stego_encode(ambient.copy(), all_facts, stego_cfg)
         if stego_main.ndim > 1:
             stego_main = stego_main.mean(axis=0)

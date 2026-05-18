@@ -11,12 +11,15 @@ class GoalPlanner:
         self.rag = RAGFlow(api_key=api_key, base_url=base_url)
 
     def collect_materials(self, goal_description: str, max_chunks: int = 30) -> list[dict]:
-        resp = self.rag.retrieve(
-            question=goal_description,
-            dataset_ids=[self.dataset_id],
-            page=1,
-            page_size=max_chunks,
-        )
+        try:
+            resp = self.rag.retrieve(
+                question=goal_description,
+                dataset_ids=[self.dataset_id],
+                page=1,
+                page_size=max_chunks,
+            )
+        except Exception as e:
+            raise ConnectionError(f"RAGFlow unavailable: {e}") from e
         chunks = []
         for item in resp:
             chunks.append({

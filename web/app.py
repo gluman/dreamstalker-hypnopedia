@@ -6,9 +6,10 @@ from pathlib import Path
 from datetime import datetime
 import uuid
 
-from fastapi import FastAPI, UploadFile, File, Request
+from fastapi import FastAPI, UploadFile, File, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from jinja2 import Environment, FileSystemLoader
 
 from content.session_manager import SessionManager, LearningGoal, TestResult
@@ -17,14 +18,24 @@ from content.test_generator import TestGenerator
 from core.audio_generator import NightAudioGenerator
 from core.anchor_generator import AnchorGenerator
 from core.logger import DreamLogger
+from core.config import get_ragflow_config, get_settings
+
+from ragflow.goal_planner import GoalPlanner
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SESSIONS_DIR = BASE_DIR / "data" / "sessions"
-RAGFLOW_BASE = "http://192.168.0.156:9380/api/v1/datasets"
-RAGFLOW_KEY = "ragflow-UJmyXeAW4Eb6OcWNCxc8oq_Q92CTUbZWGtz2hXHqRq8"
-DATASET_ID = "57e3405527a111f1ad97929ce6da87e6"
 
 app = FastAPI(title="DreamStalker")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # TODO: restrict in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "web" / "static")), name="static")
 
 jinja = Environment(loader=FileSystemLoader(str(BASE_DIR / "web" / "templates")), autoescape=True)
@@ -108,21 +119,22 @@ async def report_page(sid: str):
 async def create_plan(payload: dict):
     goal = payload.get("goal", "")
     count = payload.get("count", 20)
-    if not goal: return JSONResponse({"error": "goal required"}, status_code=400)
+    if not goal:
+        return JSONResponse({"error": "goal required"}, status_code=400)
+
+    rf = get_ragflow_config()
+    planner = GoalPlanner(
+        base_url=rf["base_url"], api_key=rf["api_key"], dataset_id=rf["dataset_id"]
+    )
     try:
-        hdr = {"Authorization": "Bearer " + RAGFLOW_KEY, "Content-Type": "application/json"}
-        resp = requests.post(RAGFLOW_BASE + "/" + DATASET_ID + "/retrieve", headers=hdr, json={"question": goal, "page_size": count}, timeout=30)
-        chunks = resp.json().get("data", []) if resp.ok else []
-    except Exception: chunks = []
-    items = []
-    seen = set()
-    for chunk in chunks[:count]:
-        text = chunk.get("content", "") if isinstance(chunk, dict) else str(chunk)
-        for sent in [s.strip() for s in text.split(".") if len(s.strip()) > 20][:2]:
-            if sent not in seen and len(items) < count: seen.add(sent); items.append({"fact": sent, "category": "general"})
-    if not items: items = [{"fact": "Fact " + str(i+1) + " about " + goal, "category": "general"} for i in range(min(count, 5))]
-    plan = {"goal": goal, "items": items, "sources": ["RAGFlow"], "created_at": datetime.now().isoformat()}
-    pp = SESSIONS_DIR / ("plan_" + datetime.now().strftime("%Y%m%d_%H%M") + ".json")
+        plan = planner.create_learning_plan(goal_description=goal, items_count=count)
+    except Exception as e:
+        # Graceful degradation: return fallback plan
+        logger.error("RAGFlow plan failed, using fallback", error=str(e))
+        items = [{"fact": f"Fact {i+1} about {goal}", "category": "general"} for i in range(min(count, 5))]
+        plan = {"goal": goal, "items": items, "sources": ["fallback"], "created_at": datetime.now().isoformat()}
+
+    pp = SESSIONS_DIR / f"plan_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
     pp.parent.mkdir(parents=True, exist_ok=True)
     pp.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
     return JSONResponse({"plan": plan, "plan_path": str(pp)})
@@ -130,14 +142,16 @@ async def create_plan(payload: dict):
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
-    url = RAGFLOW_BASE + "/" + DATASET_ID + "/documents"
+    rf = get_ragflow_config()
+    url = rf["base_url"].rstrip("/") + f"/api/v1/datasets/{rf['dataset_id']}/documents"
     content = await file.read()
     files = {"file": (file.filename, content, file.content_type)}
-    headers = {"Authorization": "Bearer " + RAGFLOW_KEY}
+    headers = {"Authorization": f"Bearer {rf['api_key']}"}
     try:
         resp = requests.post(url, headers=headers, files=files, timeout=120)
         return JSONResponse(resp.json() if resp.ok else {"error": resp.text})
-    except Exception as e: return JSONResponse({"error": str(e)}, status_code=500)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.get("/api/progress/{session_id}")
@@ -147,48 +161,62 @@ async def get_progress(session_id: str):
 
 
 @app.post("/api/prepare")
-async def prepare_session(payload: dict):
+async def prepare_session(payload: dict, background_tasks: BackgroundTasks):
     plan = payload.get("plan", {})
-    if not plan: return JSONResponse({"error": "plan required"}, status_code=400)
+    if not plan:
+        return JSONResponse({"error": "plan required"}, status_code=400)
     items = plan.get("items", [])
     goal_desc = plan.get("goal", "learning")
     pid = str(uuid.uuid4())
 
-    def _upd(step, current, message):
-        progress_store[pid] = {"step": step, "current": current, "total": 6, "message": message, "percent": round(current / 6 * 100)}
-
-    _upd("Создание сессии", 1, "Создание сессии...")
+    # Create session immediately so user gets an ID
     goal = LearningGoal(topic=goal_desc, description=goal_desc, target_items_count=len(items))
     session = sm.create_session(goal)
     sid = session.session_id
     sdir = SESSIONS_DIR / sid
     sdir.mkdir(parents=True, exist_ok=True)
 
-    _upd("Сбор пакета", 2, "Сбор пакета знаний...")
-    pkg = pb.build_sleep_package(items, compress_rate=20.0)
-    pb.save_package(pkg, str(sdir / "package.json"))
+    progress_store[pid] = {"step": "queued", "current": 0, "total": 6, "message": "В очереди...", "percent": 0}
 
-    _upd("Генерация тестов", 3, "Генерация тестов...")
-    ts = tg.generate_full_test_suite(items, tests_per_type=3)
-    tg.save_test_suite(ts, str(sdir / "test_suite.json"))
-    ti = ts.get("tests", [])
-    (sdir / "test.json").write_text(json.dumps(ti, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Run heavy work in background
+    background_tasks.add_task(_build_session, sid, sdir, items, goal_desc, pid, session)
 
-    _upd("Назначение якорей", 4, "Назначение якорей...")
-    ia = ag.assign_anchors(items)
+    return JSONResponse({"session_id": sid, "progress_id": pid, "message": "Session preparation started"})
 
-    _upd("Генерация аудио", 5, "Генерация аудио...")
-    inst = pb.build_installation_text(goal_desc, len(items))
-    ap = str(sdir / "night_session.wav")
-    ng.generate_falling_asleep_phase(items=ia, installation_text=inst, duration_min=1.0, output_path=ap)
 
-    _upd("Сохранение", 6, "Сохранение сессии...")
-    sm.save_audio(session, ap)
-    sm.save_package(session, ia)
-    sm.save_test(session, ti)
+def _build_session(sid, sdir, items, goal_desc, pid, session):
+    """Background task: build package, tests, anchors, audio."""
+    def _upd(step, current, message):
+        progress_store[pid] = {"step": step, "current": current, "total": 6, "message": message, "percent": round(current / 6 * 100)}
 
-    progress_store[pid] = {"step": "done", "current": 6, "total": 6, "message": "Готово", "percent": 100}
-    return JSONResponse({"session_id": sid, "progress_id": pid, "items_count": len(items), "tests_count": len(ti), "audio_path": ap})
+    try:
+        _upd("Сбор пакета", 1, "Сбор пакета знаний...")
+        pkg = pb.build_sleep_package(items, compress_rate=20.0)
+        pb.save_package(pkg, str(sdir / "package.json"))
+
+        _upd("Генерация тестов", 2, "Генерация тестов...")
+        ts = tg.generate_full_test_suite(items, tests_per_type=3)
+        tg.save_test_suite(ts, str(sdir / "test_suite.json"))
+        ti = ts.get("tests", [])
+        (sdir / "test.json").write_text(json.dumps(ti, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        _upd("Назначение якорей", 3, "Назначение якорей...")
+        ia = ag.assign_anchors(items)
+
+        _upd("Генерация аудио", 4, "Генерация аудио...")
+        inst = pb.build_installation_text(goal_desc, len(items))
+        ap = str(sdir / "night_session.wav")
+        ng.generate_falling_asleep_phase(items=ia, installation_text=inst, duration_min=1.0, output_path=ap)
+
+        _upd("Сохранение", 5, "Сохранение сессии...")
+        sm.save_audio(session, ap)
+        sm.save_package(session, ia)
+        sm.save_test(session, ti)
+
+        progress_store[pid] = {"step": "done", "current": 6, "total": 6, "message": "Готово", "percent": 100}
+    except Exception as e:
+        logger.error("Session build failed", session_id=sid, error=str(e))
+        progress_store[pid] = {"step": "failed", "current": 0, "total": 6, "message": f"Ошибка: {e}", "percent": 0}
 
 
 @app.get("/api/sessions")

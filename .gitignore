@@ -15,3 +15,5 @@ test_import.py
 _update_conftest.py
 _fix_session.py
 _create_deploy.py
+.env
+.opencode/

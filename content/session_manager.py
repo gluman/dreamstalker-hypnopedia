@@ -131,14 +131,29 @@ class SessionManager:
         except Exception:
             return None
 
-    def save_test_results(self, results: list[TestResult]) -> None:
+    def save_test_results(self, results, session_id: str = None) -> None:
+        """Save test results to results.json.
+        
+        Args:
+            results: Either a list of TestResult objects or a list of dicts.
+            session_id: Optional session ID override (for CLI usage).
+        """
         if not results:
             return
-        session_id = results[0].session_id
-        session_dir = self._session_dir(session_id)
+        
+        # Support both list of TestResult objects and list of dicts
+        if isinstance(results[0], TestResult):
+            sid = results[0].session_id
+            data = [asdict(r) for r in results]
+        else:
+            sid = session_id or results[0].get("session_id", "unknown")
+            data = results
+        
+        session_dir = self._session_dir(sid)
+        session_dir.mkdir(parents=True, exist_ok=True)
         results_path = session_dir / "results.json"
         results_path.write_text(
-            json.dumps([asdict(r) for r in results], ensure_ascii=False, indent=2)
+            json.dumps(data, ensure_ascii=False, indent=2)
         )
 
     def generate_report(self, session_id: str) -> SessionReport:

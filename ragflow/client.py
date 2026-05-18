@@ -1,13 +1,18 @@
+import os
 import requests
 from typing import Optional, List, Dict, Any
 
 
 class RAGFlowClient:
-    def __init__(self, base_url: str = "http://192.168.0.156:9380", api_key: str = "ragflow-UJmyXeAW4Eb6OcWNCxc8oq_Q92CTUbZWGtz2hXHqRq8"):
-        self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
+    def __init__(
+        self,
+        base_url: str = None,
+        api_key: str = None,
+    ):
+        self.base_url = (base_url or os.getenv("RAGFLOW_BASE_URL", "http://localhost:9380")).rstrip("/")
+        self.api_key = api_key or os.getenv("RAGFLOW_API_KEY", "")
         self.headers = {
-            "Authorization": f"Bearer {api_key}",
+            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
         self.api_base = f"{self.base_url}/api/v1"

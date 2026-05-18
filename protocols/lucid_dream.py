@@ -43,7 +43,7 @@ class LucidDreamProtocol:
     def get_instructions(self, technique: Technique) -> List[str]:
         return STEPS.get(technique, MILD_STEPS)
     def get_full_protocol(self, technique: Technique = Technique.MILD) -> str:
-        return f"=== {technique.value.upper()} ===
-" + chr(10).join(self.get_instructions(technique))
+        steps = self.get_instructions(technique)
+        return f"=== {technique.value.upper()} ===\n" + "\n".join(steps)
     def get_pre_sleep_affirmations(self) -> List[str]:
         return ["Tonight I will realize I am dreaming", "I am aware of my dreams", "I remember my dreams clearly"]
