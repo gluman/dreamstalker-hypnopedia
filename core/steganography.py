@@ -50,6 +50,7 @@ def _add_header(data_bits):
 
 
 def encode_lsb(audio, text, config):
+    """LSB encode. Returns array with same ndim as input (1D for mono, 2D for stereo)."""
     data_bits = _add_header(text_to_bits(text))
     audio_int = (audio * 32767).astype(np.int32)
     flat = audio_int.flatten().copy()
@@ -88,6 +89,7 @@ def decode_lsb(audio, config):
 
 
 def encode_phase(audio, text, config):
+    """Phase encode. Returns array with same ndim as input (1D for mono, 2D for stereo)."""
     data_bits = _add_header(text_to_bits(text))
     chs = [audio.copy()] if audio.ndim == 1 else [audio[ch].copy() for ch in range(audio.shape[0])]
     result = []
@@ -127,6 +129,7 @@ def _pn(length, seed=42):
 
 
 def encode_spread_spectrum(audio, text, config):
+    """DSSS encode. Returns array with same ndim as input (1D for mono, 2D for stereo)."""
     data_bits = _add_header(text_to_bits(text))
     flat = audio.flatten().copy()
     cpb = config.spread_factor
@@ -161,10 +164,12 @@ def decode_spread_spectrum(audio, config):
 
 
 def encode(audio, text, config):
+    """Dispatch to the configured encode method. Returns same ndim as input."""
     m = {StegoMethod.LSB: encode_lsb, StegoMethod.PHASE_ENCODING: encode_phase, StegoMethod.SPREAD_SPECTRUM: encode_spread_spectrum}
     return m[config.method](audio, text, config)
 
 
 def decode(audio, config):
+    """Dispatch to the configured decode method. Accepts mono or stereo input."""
     m = {StegoMethod.LSB: decode_lsb, StegoMethod.PHASE_ENCODING: decode_phase, StegoMethod.SPREAD_SPECTRUM: decode_spread_spectrum}
     return m[config.method](audio, config)
