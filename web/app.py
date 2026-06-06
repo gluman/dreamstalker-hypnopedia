@@ -170,10 +170,16 @@ async def upload_file(file: UploadFile = File(...)):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@app.get("/api/progress/{session_id}")
-async def get_progress(session_id: str):
+@app.get("/api/progress/{id}")
+async def get_progress(id: str):
+    """Get progress for either a progress_id (from /api/prepare) or session_id.
+
+    The endpoint accepts any ID and looks it up in progress_store.
+    Returns idle state if not found (instead of 404) so polling clients
+    don't error out on initial requests.
+    """
     with progress_lock:
-        p = progress_store.get(session_id, {"step": "idle", "current": 0, "total": 6, "message": "Ожидание", "percent": 0})
+        p = progress_store.get(id, {"step": "idle", "current": 0, "total": 6, "message": "Ожидание", "percent": 0})
     return JSONResponse(p)
 
 
