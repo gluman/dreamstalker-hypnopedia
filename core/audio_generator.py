@@ -116,6 +116,8 @@ class TMRGenerator:
 
     def generate_cue_sequence(self, knowledge_count: int,
                               duration_sec: float) -> List[Tuple[float, np.ndarray]]:
+        if knowledge_count < 1:
+            return []
         cues = []
         position = self.cfg.min_interval
         interval = max(self.cfg.min_interval,
