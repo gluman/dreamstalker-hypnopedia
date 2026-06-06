@@ -9,7 +9,7 @@ audio:
   base_binaural_freq: 200.0
   volume: 0.3
   stego:
-    method: "phase"
+    method: "spread"
     carrier_freq: 16000.0
 
 sleep_phases:

@@ -15,7 +15,7 @@ class StegoMethod(Enum):
 
 @dataclass
 class StegoConfig:
-    method: StegoMethod = StegoMethod.PHASE_ENCODING
+    method: StegoMethod = StegoMethod.SPREAD_SPECTRUM
     carrier_freq: float = 16000.0
     bits_per_sample: int = 2
     spread_factor: int = 8
