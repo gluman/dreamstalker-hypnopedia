@@ -1,32 +1,62 @@
 import re
+import time
+import logging
 import requests
 from ragflow_sdk import RAGFlow
 
+logger = logging.getLogger("dreamstalker.ragflow")
+
 
 class GoalPlanner:
-    def __init__(self, base_url: str, api_key: str, dataset_id: str):
+    def __init__(self, base_url: str, api_key: str, dataset_id: str,
+                 max_retries: int = 3, base_backoff_sec: float = 1.0):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.dataset_id = dataset_id
+        self.max_retries = max_retries
+        self.base_backoff_sec = base_backoff_sec
         self.rag = RAGFlow(api_key=api_key, base_url=base_url)
 
+    def _retrieve_with_retry(self, question: str, max_chunks: int):
+        """Call RAGFlow retrieve with exponential backoff. Returns empty list on failure."""
+        last_exc = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                return self.rag.retrieve(
+                    question=question,
+                    dataset_ids=[self.dataset_id],
+                    page=1,
+                    page_size=max_chunks,
+                )
+            except (requests.RequestException, ConnectionError, TimeoutError) as exc:
+                last_exc = exc
+                if attempt < self.max_retries:
+                    backoff = self.base_backoff_sec * (2 ** (attempt - 1))
+                    logger.warning(
+                        f"RAGFlow retrieve failed (attempt {attempt}/{self.max_retries}): {exc}. "
+                        f"Retrying in {backoff:.1f}s"
+                    )
+                    time.sleep(backoff)
+            except Exception as exc:
+                logger.error(f"RAGFlow retrieve unexpected error: {exc}")
+                last_exc = exc
+                break
+        logger.error(f"RAGFlow retrieve failed after {self.max_retries} attempts: {last_exc}")
+        return []
+
     def collect_materials(self, goal_description: str, max_chunks: int = 30) -> list[dict]:
-        try:
-            resp = self.rag.retrieve(
-                question=goal_description,
-                dataset_ids=[self.dataset_id],
-                page=1,
-                page_size=max_chunks,
-            )
-        except Exception as e:
-            raise ConnectionError(f"RAGFlow unavailable: {e}") from e
+        resp = self._retrieve_with_retry(goal_description, max_chunks)
         chunks = []
         for item in resp:
-            chunks.append({
-                "content": item.content if hasattr(item, "content") else str(item),
-                "source": getattr(item, "document_name", "") or getattr(item, "document_id", "unknown"),
-                "similarity": float(getattr(item, "similarity", 0.0) or 0.0),
-            })
+            try:
+                chunks.append({
+                    "content": item.content if hasattr(item, "content") else str(item),
+                    "source": getattr(item, "document_name", "") or getattr(item, "document_id", "unknown"),
+                    "similarity": float(getattr(item, "similarity", 0.0) or 0.0),
+                })
+            except Exception as exc:
+                logger.warning(f"Skipping malformed chunk: {exc}")
+                continue
         return chunks
 
     def extract_key_facts(self, chunks: list[dict], count: int = 20) -> list[dict]:
