@@ -123,7 +123,7 @@ class TMRGenerator:
         for i in range(knowledge_count):
             if position >= duration_sec:
                 break
-            freq = self.cfg.cue_freq + (i % 8) * 100
+            freq = self.cfg.cue_freq + (i % 64) * 50
             cue = self.generate_cue(freq)
             cues.append((position, cue))
             position += interval + np.random.uniform(-10, 10)
