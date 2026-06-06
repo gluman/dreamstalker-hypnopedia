@@ -98,7 +98,7 @@ def encode_phase(audio, text, config):
         mod = Zxx.copy()
         cb = min(int(config.carrier_freq * fs / config.sample_rate), mod.shape[0] - 1)
         for bi in range(min(len(data_bits), mod.shape[1])):
-            mod[cb, bi] *= np.exp(1j * int(data_bits[bi]) * (np.pi / 4))
+            mod[cb, bi] *= np.exp(1j * int(data_bits[bi]) * (np.pi / 2))
         _, rec = scipy_signal.istft(mod, fs=config.sample_rate, nperseg=fs, noverlap=fs - hop)
         rec = rec[:len(ch)]
         if len(rec) < len(ch):
@@ -113,7 +113,7 @@ def decode_phase(audio, config):
     hop = fs // 2
     f, t, Zxx = scipy_signal.stft(ch, fs=config.sample_rate, nperseg=fs, noverlap=fs - hop)
     cb = min(int(config.carrier_freq * fs / config.sample_rate), Zxx.shape[0] - 1)
-    bits = np.array([1 if abs(np.angle(Zxx[cb, i])) > np.pi / 8 else 0 for i in range(Zxx.shape[1])], dtype=np.uint8)
+    bits = np.array([1 if abs(np.angle(Zxx[cb, i])) > np.pi / 4 else 0 for i in range(Zxx.shape[1])], dtype=np.uint8)
     if len(bits) < 32:
         return ""
     dl = 0
