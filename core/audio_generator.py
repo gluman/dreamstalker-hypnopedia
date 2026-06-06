@@ -167,48 +167,90 @@ class NightAudioGenerator:
         return env
 
     def generate_full_night(self, hours: float, knowledge_items: List[str],
-                            output_path: str) -> str:
-        duration_sec = hours * 3600
-        n_samples = int(self.cfg.sample_rate * duration_sec)
-        track = np.zeros(n_samples, dtype=np.float64)
+                            output_path: str, chunk_minutes: float = 5.0) -> str:
+        """Generate full-night audio using chunk-based writing to avoid OOM.
 
-        ambient = self.ambient_gen.generate(duration_sec)
-        track += ambient
+        Writes audio to disk in fixed-size chunks (default 5 minutes) so that
+        memory usage stays bounded regardless of total duration.
+        """
+        import wave as _wave
 
-        binaural_audio = generate_night_progression(
-            total_hours=hours, sample_rate=self.cfg.sample_rate
-        )
-        # Mix stereo binaural to mono for track
-        if binaural_audio.ndim == 2:
-            binaural_mono = binaural_audio.mean(axis=0)
-        else:
-            binaural_mono = binaural_audio
+        sr = self.cfg.sample_rate
+        total_sec = int(hours * 3600)
+        chunk_sec = int(chunk_minutes * 60)
+        n_chunks = (total_sec + chunk_sec - 1) // chunk_sec
 
-        if len(binaural_mono) < n_samples:
-            binaural_mono = np.pad(binaural_mono, (0, n_samples - len(binaural_mono)))
-        track += binaural_mono[:n_samples] * 0.25
+        text_data = " ||| ".join(str(item) for item in knowledge_items) if knowledge_items else ""
 
-        # Encode knowledge text via steganography
-        if knowledge_items:
-            stego_cfg = StegoStegoConfig(method=StegoMethod.LSB, sample_rate=self.cfg.sample_rate)
-            text_data = " ||| ".join(str(item) for item in knowledge_items)
-            # Use a copy of binaural as carrier for stego encoding
-            carrier = binaural_mono[:n_samples].copy()
-            stego_audio = stego_encode(carrier, text_data, stego_cfg)
-            if stego_audio.ndim == 2:
-                stego_audio = stego_audio.mean(axis=0)
-            if len(stego_audio) >= n_samples:
-                track += stego_audio[:n_samples] * 0.05
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
 
-        tmr_cues = self.tmr_gen.generate_cue_sequence(len(knowledge_items), duration_sec)
-        for position_sec, cue in tmr_cues:
-            start_sample = int(position_sec * self.cfg.sample_rate)
-            self._mix_layer(track, cue, start_sample)
+        with _wave.open(str(path), 'w') as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(sr)
 
-        track = np.clip(track, -1.0, 1.0)
-        track_int = (track * 32767).astype(np.int16)
-        wavfile.write(output_path, self.cfg.sample_rate, track_int)
-        return output_path
+            for chunk_idx in range(n_chunks):
+                chunk_start = chunk_idx * chunk_sec
+                chunk_dur = min(chunk_sec, total_sec - chunk_start)
+                if chunk_dur <= 0:
+                    break
+
+                n = int(sr * chunk_dur)
+                track = np.zeros(n, dtype=np.float64)
+
+                ambient_dur = min(chunk_dur, 60.0)
+                pink = self.ambient_gen.generate_pink_noise(ambient_dur)
+                wind = self.ambient_gen.generate_wind(ambient_dur)
+                crickets = self.ambient_gen.generate_cricket_chirps(ambient_dur)
+                ambient = pink + wind + crickets
+                ambient_loop = np.resize(ambient, n)
+                track += ambient_loop * 0.3
+
+                bstart, bend = self._phase_freqs_for_time(chunk_start, total_sec)
+                binaural = generate_sweep(bstart, bend, chunk_dur, sr, self.cfg.ambient.wind_freq_range[0] * 5)
+                if binaural.ndim == 2:
+                    binaural = binaural.mean(axis=0)
+                track += binaural[:n] * 0.2
+
+                if text_data:
+                    stego_cfg = StegoStegoConfig(method=StegoMethod.LSB, sample_rate=sr)
+                    carrier = np.random.randn(n).astype(np.float32) * 0.005
+                    stego_audio = stego_encode(carrier, text_data[:n // 4], stego_cfg)
+                    if stego_audio.ndim > 1:
+                        stego_audio = stego_audio.mean(axis=0)
+                    slen = min(len(stego_audio), n)
+                    track[:slen] += stego_audio[:slen] * 0.03
+
+                if chunk_idx > 0 and knowledge_items:
+                    cues = self.tmr_gen.generate_cue_sequence(
+                        max(1, len(knowledge_items)), chunk_dur
+                    )
+                    for pos_sec, cue in cues:
+                        s = int(pos_sec * sr)
+                        if s + len(cue) <= n:
+                            track[s:s + len(cue)] += cue * 0.1
+
+                track = np.clip(track, -1.0, 1.0)
+                track_int = (track * 32767).astype(np.int16)
+                wav.writeframes(track_int.tobytes())
+
+                del track, track_int
+
+        return str(path)
+
+    def _phase_freqs_for_time(self, chunk_start_sec: int, total_sec: int) -> tuple:
+        """Return (start_freq, end_freq) binaural pair for the current sleep phase."""
+        ratio = chunk_start_sec / max(total_sec, 1)
+        if ratio < 30 / 480:
+            return (14.0, 10.0)
+        if ratio < 150 / 480:
+            return (10.0, 5.0)
+        if ratio < 360 / 480:
+            return (5.0, 2.0)
+        if ratio < 420 / 480:
+            return (2.0, 5.0)
+        return (5.0, 10.0)
 
 
     def generate_falling_asleep_phase(self, items, installation_text,
