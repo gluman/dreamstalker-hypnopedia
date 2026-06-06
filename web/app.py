@@ -1,15 +1,15 @@
 """DreamStalker FastAPI Web Application."""
 
 import json
+import threading
 import requests
 from pathlib import Path
 from datetime import datetime
 import uuid
 
-from fastapi import FastAPI, UploadFile, File, Request, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
 from jinja2 import Environment, FileSystemLoader
 
 from content.session_manager import SessionManager, LearningGoal, TestResult
@@ -47,6 +47,7 @@ ag = AnchorGenerator()
 ng = NightAudioGenerator()
 
 progress_store = {}
+progress_lock = threading.Lock()
 logger = DreamLogger()
 
 
@@ -156,7 +157,8 @@ async def upload_file(file: UploadFile = File(...)):
 
 @app.get("/api/progress/{session_id}")
 async def get_progress(session_id: str):
-    p = progress_store.get(session_id, {"step": "idle", "current": 0, "total": 6, "message": "Ожидание", "percent": 0})
+    with progress_lock:
+        p = progress_store.get(session_id, {"step": "idle", "current": 0, "total": 6, "message": "Ожидание", "percent": 0})
     return JSONResponse(p)
 
 
@@ -187,7 +189,8 @@ async def prepare_session(payload: dict, background_tasks: BackgroundTasks):
 def _build_session(sid, sdir, items, goal_desc, pid, session):
     """Background task: build package, tests, anchors, audio."""
     def _upd(step, current, message):
-        progress_store[pid] = {"step": step, "current": current, "total": 6, "message": message, "percent": round(current / 6 * 100)}
+        with progress_lock:
+            progress_store[pid] = {"step": step, "current": current, "total": 6, "message": message, "percent": round(current / 6 * 100)}
 
     try:
         _upd("Сбор пакета", 1, "Сбор пакета знаний...")
