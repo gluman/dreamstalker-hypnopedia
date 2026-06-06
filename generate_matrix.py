@@ -93,12 +93,25 @@ def generate_matrix_audio(
     gen = NightAudioGenerator(night_cfg)
 
     print(f"Generating {hours}h audio (chunk-based, memory-safe)...")
-    gen.generate_full_night(
-        hours=hours,
-        knowledge_items=[stego_text],
-        output_path=str(output),
-        chunk_minutes=5.0,
-    )
+    try:
+        gen.generate_full_night(
+            hours=hours,
+            knowledge_items=[stego_text],
+            output_path=str(output),
+            chunk_minutes=5.0,
+        )
+    except KeyboardInterrupt:
+        if output.exists():
+            output.unlink()
+        print(f"\nInterrupted by user. Partial file removed: {output}")
+        return
+    except Exception as e:
+        if output.exists():
+            output.unlink()
+        print(f"\nError during generation: {e}. Partial file removed.")
+        raise
+
+    print(f"Generating {hours}h audio (chunk-based, memory-safe)...")
 
     inject_anchor_layer(str(output), pkg, sample_rate)
 
