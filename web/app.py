@@ -11,6 +11,7 @@ from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
+from pydantic import BaseModel, Field
 
 from content.session_manager import SessionManager, LearningGoal, TestResult
 from content.package_builder import PackageBuilder
@@ -49,6 +50,20 @@ ng = NightAudioGenerator()
 progress_store = {}
 progress_lock = threading.Lock()
 logger = DreamLogger()
+
+
+class PlanRequest(BaseModel):
+    goal: str = Field(..., min_length=1, max_length=500)
+    count: int = Field(20, ge=1, le=100)
+
+
+class PrepareRequest(BaseModel):
+    plan: dict
+    hours: float = Field(7.0, ge=1.0, le=12.0)
+
+
+class TestSubmitRequest(BaseModel):
+    answers: list[dict]
 
 
 def _render(name, **ctx):
@@ -117,11 +132,9 @@ async def report_page(sid: str):
 
 
 @app.post("/api/plan")
-async def create_plan(payload: dict):
-    goal = payload.get("goal", "")
-    count = payload.get("count", 20)
-    if not goal:
-        return JSONResponse({"error": "goal required"}, status_code=400)
+async def create_plan(payload: PlanRequest):
+    goal = payload.goal
+    count = payload.count
 
     rf = get_ragflow_config()
     planner = GoalPlanner(
@@ -163,11 +176,13 @@ async def get_progress(session_id: str):
 
 
 @app.post("/api/prepare")
-async def prepare_session(payload: dict, background_tasks: BackgroundTasks):
-    plan = payload.get("plan", {})
-    if not plan:
-        return JSONResponse({"error": "plan required"}, status_code=400)
+async def prepare_session(payload: PrepareRequest, background_tasks: BackgroundTasks):
+    plan = payload.plan
+    if not plan or "items" not in plan:
+        return JSONResponse({"error": "plan with items required"}, status_code=400)
     items = plan.get("items", [])
+    if not items:
+        return JSONResponse({"error": "plan.items must not be empty"}, status_code=400)
     goal_desc = plan.get("goal", "learning")
     pid = str(uuid.uuid4())
 
@@ -235,8 +250,8 @@ async def serve_audio(sid: str):
 
 
 @app.post("/api/test/{sid}/submit")
-async def submit_test(sid: str, payload: dict):
-    answers = payload.get("answers", [])
+async def submit_test(sid: str, payload: TestSubmitRequest):
+    answers = payload.answers
     sdir = SESSIONS_DIR / sid
     tp = sdir / "test.json"
     if not tp.exists(): return JSONResponse({"error": "not found"}, status_code=404)
