@@ -14,17 +14,12 @@ from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, Field
 
 from content.session_manager import SessionManager, LearningGoal, TestResult
-from content.package_builder import PackageBuilder
-from content.test_generator import TestGenerator
-from core.audio_generator import NightAudioGenerator
-from core.anchor_generator import AnchorGenerator
-from core.logger import DreamLogger
-from core.config import get_ragflow_config, get_settings
+from core.config import get_ragflow_config
+from core.services import ServiceContainer
 
 from ragflow.goal_planner import GoalPlanner
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-SESSIONS_DIR = BASE_DIR / "data" / "sessions"
 
 app = FastAPI(title="DreamStalker")
 
@@ -41,15 +36,17 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "web" / "static")), na
 
 jinja = Environment(loader=FileSystemLoader(str(BASE_DIR / "web" / "templates")), autoescape=True)
 
-sm = SessionManager(str(SESSIONS_DIR))
-pb = PackageBuilder()
-tg = TestGenerator()
-ag = AnchorGenerator()
-ng = NightAudioGenerator()
+services = ServiceContainer()
+sm = services.session_manager
+pb = services.package_builder
+tg = services.test_generator
+ag = services.anchor_generator
+ng = services.night_audio_generator
+SESSIONS_DIR = services.sessions_dir
+logger = services.logger
 
 progress_store = {}
 progress_lock = threading.Lock()
-logger = DreamLogger()
 
 
 class PlanRequest(BaseModel):
