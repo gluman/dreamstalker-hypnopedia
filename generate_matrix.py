@@ -63,6 +63,49 @@ def inject_anchor_layer(wav_path: str, pkg: dict, sample_rate: int = 44100):
     print(f"Anchor layer added ({len(pkg['core_words_300'])} tones)")
 
 
+def inject_os_triggers(wav_path: str, sample_rate: int = 44100,
+                       rem_start_min: int = 360, rem_end_min: int = 420,
+                       trigger_freq: float = 880.0,
+                       trigger_interval_sec: int = 90):
+    """Inject lucid-dream trigger tones during REM windows.
+
+    Strategy: between rem_start_min and rem_end_min of the audio, place a
+    distinct high-frequency tone (default 880Hz) every trigger_interval_sec.
+    Combined with gamma-bursts generated in core, this gives the listener a
+    multi-sensory reality-check cue to enter a lucid dream.
+    """
+    from scipy.io import wavfile
+    import numpy as np
+
+    print(f"Injecting OS triggers in REM window ({rem_start_min}-{rem_end_min} min)...")
+    sr, audio = wavfile.read(wav_path)
+    audio = audio.astype(np.float32) / 32767.0
+
+    start_sample = int(rem_start_min * 60 * sr)
+    end_sample = int(rem_end_min * 60 * sr)
+    end_sample = min(end_sample, len(audio))
+    if start_sample >= end_sample:
+        print("  REM window outside audio range, skipping")
+        return
+
+    n = int(0.5 * sr)  # 0.5s tone
+    t = np.linspace(0, 0.5, n, endpoint=False)
+    tone = np.sin(2 * np.pi * trigger_freq * t)
+    tone = tone * np.hanning(n) * 0.08
+
+    pos = start_sample
+    count = 0
+    while pos + n < end_sample:
+        audio[pos:pos + n] += tone
+        pos += trigger_interval_sec * sr
+        count += 1
+
+    audio = np.clip(audio, -1.0, 1.0)
+    audio_int = (audio * 32767).astype(np.int16)
+    wavfile.write(wav_path, sr, audio_int)
+    print(f"OS triggers added: {count} tones @ {trigger_freq}Hz in REM window")
+
+
 def generate_matrix_audio(
     pkg_path: str = "data/chinese/matrix/core_package.json",
     output_path: str = "data/chinese/matrix/matrix_download.wav",
@@ -114,6 +157,7 @@ def generate_matrix_audio(
     print(f"Generating {hours}h audio (chunk-based, memory-safe)...")
 
     inject_anchor_layer(str(output), pkg, sample_rate)
+    inject_os_triggers(str(output), sample_rate=sample_rate)
 
     size_mb = output.stat().st_size / (1024 * 1024)
     print(f"\nAudio generated: {output}")
