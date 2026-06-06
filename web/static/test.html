@@ -85,6 +85,15 @@
 
   <!-- CONFIG -->
   <div class="panel active" id="panel-config">
+    <div id="package-loader" class="config-section" style="background:#2a1a2e;">
+      <h3>📦 Загрузка пакета</h3>
+      <p style="color:#aaa;margin-bottom:12px;font-size:0.9em;">
+        Выберите файл <code>core_package.json</code> с компьютера.
+        Работает при открытии HTML напрямую (file://) и через веб-сервер.
+      </p>
+      <input type="file" id="packageFile" accept=".json" style="margin-bottom:12px;">
+      <div id="packageStatus" style="color:#888;font-size:0.85em;"></div>
+    </div>
     <div class="config-section">
       <h3>Настройка теста</h3>
       <div class="config-row">
@@ -244,14 +253,46 @@ let fcWords = [];
 let testHistory = [];
 
 async function loadPackage() {
+  const status = document.getElementById('packageStatus');
   try {
     const resp = await fetch(PACKAGE_URL);
-    pkg = await resp.json();
-    console.log(`Loaded: ${pkg.core_words_300.length} words`);
+    if (resp.ok) {
+      pkg = await resp.json();
+      console.log(`Loaded via fetch: ${pkg.core_words_300.length} words`);
+      if (status) {
+        status.textContent = `✅ Загружено через HTTP: ${pkg.core_words_300.length} слов`;
+        status.style.color = '#00ff88';
+      }
+      return;
+    }
   } catch(e) {
-    alert('Не удалось загрузить core_package.json. Убедитесь, что файл находится в data/chinese/matrix/');
-    console.error(e);
+    console.log('Fetch failed, waiting for manual file upload');
   }
+  if (status) {
+    status.textContent = '⚠️ fetch() не сработал (file://?). Загрузите core_package.json вручную ↓';
+    status.style.color = '#ffaa00';
+  }
+}
+
+function loadPackageFromFile(file) {
+  const status = document.getElementById('packageStatus');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      pkg = JSON.parse(e.target.result);
+      if (status) {
+        status.textContent = `✅ Загружено: ${pkg.core_words_300.length} слов`;
+        status.style.color = '#00ff88';
+      }
+      console.log(`Loaded via file: ${pkg.core_words_300.length} words`);
+    } catch(err) {
+      if (status) {
+        status.textContent = `❌ Ошибка парсинга: ${err.message}`;
+        status.style.color = '#ff4444';
+      }
+    }
+  };
+  reader.readAsText(file);
 }
 
 function showPanel(name) {
@@ -619,6 +660,11 @@ function filterWords() {
 }
 
 loadPackage();
+
+document.getElementById('packageFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) loadPackageFromFile(file);
+});
 </script>
 </body>
 </html>
