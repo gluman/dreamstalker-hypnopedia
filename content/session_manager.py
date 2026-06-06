@@ -204,10 +204,10 @@ class SessionManager:
         sessions = []
         for meta_file in sorted(self.base_path.glob("*/metadata.json")):
             try:
-                data = json.loads(meta_file.read_text(encoding="utf-8"))
-                if status is None or data.get("status") == status:
-                    sessions.append(data)
-            except (json.JSONDecodeError, UnicodeDecodeError, KeyError):
+                session = self.load_session(meta_file.parent.name)
+                if status is None or session.status == status:
+                    sessions.append(session)
+            except (json.JSONDecodeError, UnicodeDecodeError, KeyError, FileNotFoundError):
                 continue
         return sessions
 

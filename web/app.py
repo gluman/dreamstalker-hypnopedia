@@ -78,16 +78,21 @@ def _sd(s):
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
     sessions = sm.list_sessions()
+    enriched = []
     for s in sessions:
-        sid = s.get("session_id", "")
+        sid = s.session_id
         sdir = SESSIONS_DIR / sid
-        s["id"] = sid
-        s["goal"] = s.get("goal", {}).get("topic", "Unknown")
-        s["created"] = s.get("created_at", "")[:16]
-        s["has_audio"] = (sdir / "night_session.wav").exists()
-        s["has_test"] = (sdir / "test.json").exists()
-        s["has_report"] = (sdir / "results.json").exists()
-    return _render("dashboard.html", sessions=sessions)
+        goal_topic = s.goal.topic if hasattr(s.goal, "topic") else "Unknown"
+        enriched.append({
+            "id": sid,
+            "goal": goal_topic,
+            "created": s.created_at[:16],
+            "status": s.status,
+            "has_audio": (sdir / "night_session.wav").exists(),
+            "has_test": (sdir / "test.json").exists(),
+            "has_report": (sdir / "results.json").exists(),
+        })
+    return _render("dashboard.html", sessions=enriched)
 
 
 @app.get("/prepare", response_class=HTMLResponse)
