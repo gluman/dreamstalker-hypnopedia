@@ -106,6 +106,61 @@ def inject_os_triggers(wav_path: str, sample_rate: int = 44100,
     print(f"OS triggers added: {count} tones @ {trigger_freq}Hz in REM window")
 
 
+def inject_lucid_cues(wav_path: str, sample_rate: int = 44100,
+                     rem_start_min: int = 360, rem_end_min: int = 420,
+                     affirmations: list = None, triggers: list = None,
+                     cue_freq: float = 1320.0, cue_volume: float = 0.07):
+    """Inject per-affirmation and per-trigger cue tones in the REM window.
+
+    Distinct frequency (1320Hz, E6) for affirmations vs 880Hz (A5) for triggers
+    so the listener can mentally separate 'becoming lucid' (affirmation) from
+    'do a reality check now' (trigger) cues.
+    """
+    from scipy.io import wavfile
+    import numpy as np
+
+    if affirmations is None and triggers is None:
+        print("No lucid cues provided, skipping")
+        return
+
+    print(f"Injecting lucid dream cues in REM window ({rem_start_min}-{rem_end_min} min)...")
+    sr, audio = wavfile.read(wav_path)
+    audio = audio.astype(np.float32) / 32767.0
+
+    start_sample = int(rem_start_min * 60 * sr)
+    end_sample = int(rem_end_min * 60 * sr)
+    end_sample = min(end_sample, len(audio))
+    if start_sample >= end_sample:
+        print("  REM window outside audio range, skipping")
+        return
+
+    n = int(0.3 * sr)
+    t = np.linspace(0, 0.3, n, endpoint=False)
+    aff_tone = np.sin(2 * np.pi * cue_freq * t) * np.hanning(n) * cue_volume
+    trig_freq = cue_freq * (880.0 / 1320.0)
+    trig_tone = np.sin(2 * np.pi * trig_freq * t) * np.hanning(n) * cue_volume
+
+    aff_count = 0
+    trig_count = 0
+    pos = start_sample
+    while pos + n < end_sample:
+        if aff_count < len(affirmations or []):
+            audio[pos:pos + n] += aff_tone
+            aff_count += 1
+        elif trig_count < len(triggers or []):
+            audio[pos:pos + n] += trig_tone
+            trig_count += 1
+        else:
+            break
+        pos += int(60 * sr)
+
+    audio = np.clip(audio, -1.0, 1.0)
+    audio_int = (audio * 32767).astype(np.int16)
+    wavfile.write(wav_path, sr, audio_int)
+    print(f"Lucid cues added: {aff_count} affirmations @ {cue_freq}Hz, "
+          f"{trig_count} triggers @ {trig_freq:.0f}Hz")
+
+
 def generate_matrix_audio(
     pkg_path: str = "data/chinese/matrix/core_package.json",
     output_path: str = "data/chinese/matrix/matrix_download.wav",
@@ -158,6 +213,11 @@ def generate_matrix_audio(
 
     inject_anchor_layer(str(output), pkg, sample_rate)
     inject_os_triggers(str(output), sample_rate=sample_rate)
+
+    from protocols.affirmations import LUCID_AFFIRMATIONS, LUCID_TRIGGERS
+    inject_lucid_cues(str(output), sample_rate=sample_rate,
+                      affirmations=LUCID_AFFIRMATIONS,
+                      triggers=LUCID_TRIGGERS)
 
     size_mb = output.stat().st_size / (1024 * 1024)
     print(f"\nAudio generated: {output}")
