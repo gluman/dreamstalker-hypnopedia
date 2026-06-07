@@ -189,6 +189,25 @@ let fcIndex = 0;
 let fcWords = [];
 let testHistory = [];
 
+// In-memory fallback when localStorage/cookies are blocked (e.g. file:// in Chrome)
+const _memoryStore = {};
+const safeStorage = {
+  getItem(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      return _memoryStore[key] || null;
+    }
+  },
+  setItem(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      _memoryStore[key] = value;
+    }
+  },
+};
+
 async function loadPackage() {
   const status = document.getElementById('packageStatus');
   try {
@@ -523,6 +542,7 @@ function saveResults() {
     answers: testState.answers
   });
   localStorage.setItem('matrix_test_history', JSON.stringify(testHistory));
+  safeStorage.setItem('matrix_test_history', JSON.stringify(testHistory));
 }
 
 function showResults() {
@@ -597,6 +617,17 @@ function filterWords() {
 }
 
 loadPackage();
+
+// Load saved test history
+try {
+  const saved = localStorage.getItem('matrix_test_history') || safeStorage.getItem('matrix_test_history');
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    if (Array.isArray(parsed)) testHistory = parsed;
+  }
+} catch (e) {
+  console.log('History load failed, starting empty');
+}
 
 document.getElementById('packageFile').addEventListener('change', (e) => {
   const file = e.target.files[0];
