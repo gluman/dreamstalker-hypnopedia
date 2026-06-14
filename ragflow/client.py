@@ -1,25 +1,44 @@
 import os
+import time
+import logging
 import requests
 from typing import Optional, List, Dict, Any
 
+logger = logging.getLogger("dreamstalker.ragflow.client")
+
 
 class RAGFlowClient:
-    def __init__(
-        self,
-        base_url: str = None,
-        api_key: str = None,
-    ):
-        self.base_url = (base_url or os.getenv("RAGFLOW_BASE_URL", "http://localhost:9380")).rstrip("/")
-        self.api_key = api_key or os.getenv("RAGFLOW_API_KEY", "")
+    def __init__(self, base_url: str = "http://192.168.0.156:9380",
+                 api_key: str = "ragflow-UJmyXeAW4Eb6OcWNCxc8oq_Q92CTUbZWGtz2hXHqRq8",
+                 max_retries: int = 3, base_backoff_sec: float = 1.0):
+        self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
+        self.max_retries = max_retries
+        self.base_backoff_sec = base_backoff_sec
         self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
         self.api_base = f"{self.base_url}/api/v1"
 
-    def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+    def _request_with_retry(self, method: str, endpoint: str, **kwargs) -> requests.Response:
+        """HTTP request with exponential backoff retry on transient failures."""
         url = f"{self.api_base}{endpoint}"
-        response = requests.request(method, url, headers=self.headers, **kwargs)
+        last_exc = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                return requests.request(method, url, headers=self.headers, **kwargs)
+            except (requests.RequestException, ConnectionError, TimeoutError) as exc:
+                last_exc = exc
+                if attempt < self.max_retries:
+                    backoff = self.base_backoff_sec * (2 ** (attempt - 1))
+                    logger.warning(f"RAGFlow {method} {endpoint} failed (attempt {attempt}): {exc}. Retry in {backoff:.1f}s")
+                    time.sleep(backoff)
+        logger.error(f"RAGFlow {method} {endpoint} failed after {self.max_retries} attempts: {last_exc}")
+        raise last_exc
+
+    def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+        response = self._request_with_retry(method, endpoint, **kwargs)
         response.raise_for_status()
         return response.json()
 

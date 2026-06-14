@@ -130,6 +130,7 @@ async def dashboard():
             "created": s.created_at[:16],
             "status": s.status,
             "has_audio": (sdir / "night_session.wav").exists(),
+            "has_package": (sdir / "package.json").exists(),
             "has_test": (sdir / "test.json").exists(),
             "has_report": (sdir / "results.json").exists(),
         })
